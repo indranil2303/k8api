@@ -85,8 +85,8 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v5
         with:
-          context: ./src/k8api
-          file: ./src/k8api/Dockerfile
+          context: .
+          file: Dockerfile
           push: true
           platforms: linux/amd64,linux/arm64
           tags: |
