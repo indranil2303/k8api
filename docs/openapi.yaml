@@ -1,0 +1,136 @@
+openapi: 3.0.3
+info:
+  title: k8api
+  version: 1.0.0
+  description: Minimal OpenAPI spec for the k8api CRUD endpoints and health checks.
+servers:
+  - url: http://localhost:8080
+paths:
+  /api/products:
+    get:
+      summary: Get paged list of products
+      parameters:
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 1
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+      responses:
+        '200':
+          description: A paged list of products
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Product'
+    post:
+      summary: Create a new product
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductCreate'
+      responses:
+        '201':
+          description: Created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+  /api/products/{id}:
+    parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+          format: uuid
+    get:
+      summary: Get product by id
+      responses:
+        '200':
+          description: Product found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Product'
+        '404':
+          description: Not found
+    put:
+      summary: Update product by id
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ProductUpdate'
+      responses:
+        '204':
+          description: No content
+        '404':
+          description: Not found
+    delete:
+      summary: Delete product by id
+      responses:
+        '204':
+          description: Deleted
+        '404':
+          description: Not found
+  /health:
+    get:
+      summary: Liveness health check
+      responses:
+        '200':
+          description: OK
+  /ready:
+    get:
+      summary: Readiness health check (sql, redis)
+      responses:
+        '200':
+          description: Ready
+components:
+  schemas:
+    Product:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        price:
+          type: number
+          format: decimal
+      required:
+        - id
+        - name
+        - price
+    ProductCreate:
+      type: object
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+          format: decimal
+      required:
+        - name
+        - price
+    ProductUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+        price:
+          type: number
+          format: decimal
+      required:
+        - name
+        - price

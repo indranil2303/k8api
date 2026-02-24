@@ -1,0 +1,43 @@
+# Visual Studio / .NET
+bin/
+obj/
+*.user
+*.userosscache
+*.suo
+*.tmp
+*.log
+.vs/
+.vsconfig
+
+# Build outputs
+publish/
+*.dll
+*.exe
+*.nupkg
+
+# JetBrains
+.idea/
+
+# VSCode
+.vscode/
+
+# NuGet packages
+packages/
+
+# EF Migrations Snapshot & tooling
+*.Snapshot.cs
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local settings and secrets
+appsettings.Development.json
+.env
+
+# Docker overrides
+docker-compose.override.yml
+
+# Logs and test results
+TestResults/
+logs/

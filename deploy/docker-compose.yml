@@ -1,0 +1,134 @@
+version: "3.9"
+
+services:
+
+  api:
+    image: ghcr.io/indranil2303/k8api:${TAG:-latest}
+    env_file:
+      - .env
+    environment:
+      ConnectionStrings__DefaultConnection: "Server=db;Database=Localdb;User Id=sa;Password=${DB_PASSWORD};TrustServerCertificate=True"
+      Redis__Connection: "redis:6379"
+      OTEL_EXPORTER_OTLP_ENDPOINT: "http://otel:4317"
+      ASPNETCORE_ENVIRONMENT: "Production"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_started
+      otel:
+        condition: service_started
+    ports:
+      - "8080:8080"
+    networks:
+      - backend
+
+  db:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    env_file:
+      - .env
+    environment:
+      SA_PASSWORD: ${DB_PASSWORD}
+      ACCEPT_EULA: "Y"
+    volumes:
+      - dbdata:/var/opt/mssql
+    ports:
+      - "1433:1433"
+    healthcheck:
+      test: ["CMD-SHELL", "grep -q 'SQL Server is now ready for client connections' /var/opt/mssql/log/errorlog"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+    networks:
+      - backend
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - backend
+
+  otel:
+    image: otel/opentelemetry-collector-contrib:0.102.0
+    command: ["--config=/etc/otel-collector-config.yml"]
+    volumes:
+      - ./otel-collector-config.yml:/etc/otel-collector-config.yml:ro
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "9464:9464"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - backend
+
+  prometheus:
+    image: prom/prometheus:v2.52.0
+    depends_on:
+      - otel
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "9090:9090"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+    networks:
+      - backend
+
+  grafana:
+    image: grafana/grafana:10.4.2
+    env_file:
+      - .env
+    environment:
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD}
+    volumes:
+      - grafana:/var/lib/grafana
+      - ./grafana/datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./grafana/dashboard/dashboard.yml:/etc/grafana/provisioning/dashboards/dashboard.yml:ro
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 256M
+    networks:
+      - backend
+
+networks:
+  backend:
+
+volumes:
+  dbdata:
+  redisdata:
+  grafana:
+  prometheus_data:
