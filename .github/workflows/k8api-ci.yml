@@ -14,8 +14,9 @@ env:
   IMAGE_NAME: ${{ github.repository_owner }}/k8api
 
 permissions:
-  contents: read
-  packages: write
+  security-events: write    # Required to upload SARIF files
+  contents: read       # Required for checkout
+  actions: read   # Often required for telemetry/status reports
 
 jobs:
   restore-build-test:
