@@ -140,9 +140,11 @@ jobs:
 
       - name: Set up kubelogin for AKS
         uses: azure/use-kubelogin@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           kubelogin-version: 'latest'
-          
+
       # 3. Create Image Pull Secret for GHCR
       # This allows AKS to authenticate with GHCR using your secrets
       - name: Create Secret for GHCR
