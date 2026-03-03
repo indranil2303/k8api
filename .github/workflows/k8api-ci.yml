@@ -130,8 +130,16 @@ jobs:
         uses: azure/login@v1
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      # 2. Set AKS Context (Connect to the cluster)
+      
+      # 2. Set AKS Context (Now it can find the tool installed in Step 1)
+      - name: Set up kubelogin for AKS
+        uses: azure/use-kubelogin@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          kubelogin-version: 'latest'
+          
+      # 3. Set AKS Context (Connect to the cluster)
       - name: Set AKS Context
         uses: azure/aks-set-context@v3
         with:
@@ -140,29 +148,22 @@ jobs:
           admin: 'false'
           use-kubelogin: 'true'
 
-      - name: Set up kubelogin for AKS
-        uses: azure/use-kubelogin@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          kubelogin-version: 'latest'
-
       - name: Configure Kubelogin for Service Principal
         run: kubelogin convert-kubeconfig -l azurecli
 
-      # 3. Create Image Pull Secret for GHCR
+      # 4. Create Image Pull Secret for GHCR
       # This allows AKS to authenticate with GHCR using your secrets
       - name: Create Secret for GHCR
         uses: azure/k8s-create-secret@v4
         with:
           namespace: default
-          container-registry-url: ghcr.io
+          secret-type: 'generic'
+          secret-name: ghcr-secret
+          container-registry-url: ${{ env.REGISTRY }}
           container-registry-username: ${{ github.actor }}
           container-registry-password: ${{ secrets.ACCESS_TOKEN }}
-          secret-name: ghcr-secret
-          secret-type: 'generic'
-
-      # 4. Deploy to AKS
+          
+      # 5. Deploy to AKS
       # This action replaces the image in your manifest with the specific SHA tag
       - name: Deploy to Kubernetes
         uses: azure/k8s-deploy@v4
