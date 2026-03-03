@@ -138,6 +138,11 @@ jobs:
           resource-group: ${{ env.RESOURCE_GROUP }}
           cluster-name: ${{ env.AKS_CLUSTER_NAME }}
 
+      - name: Set up kubelogin for AKS
+        uses: azure/use-kubelogin@v1
+        with:
+          kubelogin-version: 'latest'
+          
       # 3. Create Image Pull Secret for GHCR
       # This allows AKS to authenticate with GHCR using your secrets
       - name: Create Secret for GHCR
