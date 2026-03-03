@@ -11,7 +11,7 @@ spec:
     targetPort: 6379
   selector:
     app: redis
-
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -35,7 +35,7 @@ spec:
           limits:
             memory: "256Mi"
             cpu: "200m"
-
+---
 # ==========================================
 # 2. SQL SERVER SERVICE, PVC & DEPLOYMENT
 # ==========================================
@@ -49,7 +49,7 @@ spec:
     targetPort: 1433
   selector:
     app: mssql
-
+---
 # Persistent Storage for Database (Keeps data if pod restarts)
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -61,7 +61,7 @@ spec:
   resources:
     requests:
       storage: 2Gi
-
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -101,7 +101,7 @@ spec:
       - name: mssqldb
         persistentVolumeClaim:
           claimName: mssql-data
-
+---
 # ==========================================
 # 3. API SERVICE & DEPLOYMENT (GHCR)
 # ==========================================
@@ -116,7 +116,7 @@ spec:
     targetPort: 8080
   selector:
     app: k8api
-
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
