@@ -1,0 +1,155 @@
+# ==========================================
+# 1. REDIS SERVICE & DEPLOYMENT
+# ==========================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis  # DNS name: 'redis' (matches your docker-compose)
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: redis
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        resources:
+          limits:
+            memory: "256Mi"
+            cpu: "200m"
+
+# ==========================================
+# 2. SQL SERVER SERVICE, PVC & DEPLOYMENT
+# ==========================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: db  # DNS name: 'db' (matches your docker-compose)
+spec:
+  ports:
+  - port: 1433
+    targetPort: 1433
+  selector:
+    app: mssql
+
+# Persistent Storage for Database (Keeps data if pod restarts)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mssql-data
+spec:
+  accessModes:
+    - ReadWrite
+  resources:
+    requests:
+      storage: 2Gi
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: mssql-deployment
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mssql
+  template:
+    metadata:
+      labels:
+        app: mssql
+    spec:
+      terminationGracePeriodSeconds: 30
+      containers:
+      - name: mssql
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        ports:
+        - containerPort: 1433
+        env:
+        - name: ACCEPT_EULA
+          value: "Y"
+        - name: MSSQL_SA_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-secrets
+              key: sa-password
+        volumeMounts:
+        - name: mssqldb
+          mountPath: /var/opt/mssql
+        resources:
+          limits:
+            memory: "2Gi" # SQL Server needs minimum 2GB
+            cpu: "1000m"
+      volumes:
+      - name: mssqldb
+        persistentVolumeClaim:
+          claimName: mssql-data
+
+# ==========================================
+# 3. API SERVICE & DEPLOYMENT (GHCR)
+# ==========================================
+apiVersion: v1
+kind: Service
+metadata:
+  name: k8api-service
+spec:
+  type: LoadBalancer  # Exposes API to the internet
+  ports:
+  - port: 80
+    targetPort: 8080
+  selector:
+    app: k8api
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: k8api-deployment
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: k8api
+  template:
+    metadata:
+      labels:
+        app: k8api
+    spec:
+      imagePullSecrets:
+        - name: ghcr-secret  # Required for pulling private GHCR image
+      containers:
+        - name: k8api
+          image: ghcr.io/indranil2303/k8api:latest
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ASPNETCORE_ENVIRONMENT
+              value: "Production"
+            # Using Kubernetes Internal DNS to find services by name
+            - name: ConnectionStrings__DefaultConnection
+              valueFrom:
+                secretKeyRef:
+                  name: db-secrets
+                  key: db-connection-string
+            - name: Redis__Connection
+              value: "redis:6379"
+          resources:
+            limits:
+              memory: "512Mi"
+              cpu: "500m"

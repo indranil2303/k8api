@@ -12,10 +12,12 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository_owner }}/k8api
+  RESOURCE_GROUP: k8api-rg
+  AKS_CLUSTER_NAME: k8api-aks
 
 permissions:
-  security-events: write    # Required to upload SARIF files
-  contents: read       # Required for checkout
+  security-events: write   # Required to upload SARIF files
+  contents: read     # Required for checkout
   actions: read   # Often required for telemetry/status reports
 
 jobs:
@@ -59,7 +61,7 @@ jobs:
           name: publish
           path: ./publish
 
-  docker:
+  ghcr-push:
     needs: restore-build-test
     runs-on: ubuntu-latest
 
@@ -107,7 +109,7 @@ jobs:
           TRIVY_USERNAME: ${{ github.actor }}
           TRIVY_PASSWORD: ${{ secrets.ACCESS_TOKEN }}
         with:
-          image-ref: ghcr.io/${{ github.repository_owner }}/k8api:${{ github.sha }}
+          image-ref: ${{ env.REGISTRY }}/${{ github.repository_owner }}/k8api:${{ github.sha }}
           format: sarif
           output: trivy-results.sarif
 
@@ -115,3 +117,47 @@ jobs:
         uses: github/codeql-action/upload-sarif@v3
         with:
           sarif_file: trivy-results.sarif
+
+  deploy:
+    needs: ghcr-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # 1. Login to Azure
+      - name: Azure Login
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      # 2. Set AKS Context (Connect to the cluster)
+      - name: Set AKS Context
+        uses: azure/aks-set-context@v3
+        with:
+          resource-group: ${{ env.RESOURCE_GROUP }}
+          cluster-name: ${{ env.AKS_CLUSTER_NAME }}
+
+      # 3. Create Image Pull Secret for GHCR
+      # This allows AKS to authenticate with GHCR using your secrets
+      - name: Create Secret for GHCR
+        uses: azure/k8s-create-secret@v4
+        with:
+          namespace: default
+          container-registry-url: ghcr.io
+          container-registry-username: ${{ github.actor }}
+          container-registry-password: ${{ secrets.ACCESS_TOKEN }}
+          secret-name: ghcr-secret
+
+      # 4. Deploy to AKS
+      # This action replaces the image in your manifest with the specific SHA tag
+      - name: Deploy to Kubernetes
+        uses: azure/k8s-deploy@v4
+        with:
+          namespace: default
+          manifests: |
+            k8s/deployment.yml
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}
+          imagepullsecrets: |
+            ghcr-secret
